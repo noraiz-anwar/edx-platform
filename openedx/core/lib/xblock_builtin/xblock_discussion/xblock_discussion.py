@@ -112,9 +112,12 @@ class DiscussionXBlock(XBlock, StudioEditableXBlockMixin, XmlParserMixin):
 
         context = {
             'discussion_id': self.discussion_id,
+            'display_name': self.display_name,
             'user': self.django_user,
             'course': course,
             'course_id': self.course_key,
+            'discussion_category': self.discussion_category,
+            'discussion_target': self.discussion_target,
             'can_create_thread': self.has_permission("create_thread"),
             'can_create_comment': self.has_permission("create_comment"),
             'can_create_subcomment': self.has_permission("create_sub_comment"),

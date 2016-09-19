@@ -121,5 +121,9 @@ $headings-base-color:                       $gray-d2;
         font-weight: $headings-font-weight-normal;
         // override external modules and xblocks that use inline CSS
         text-transform: initial;
+        &.h3--discussion-module {
+            margin-bottom: 0;
+            display: inline-block;
+        }
     }
 }

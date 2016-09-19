@@ -13,6 +13,7 @@
                 render: function() {
                     var discussionModuleView = new DiscussionModuleView({
                         el: this.$el,
+                        readOnly: this.el.dataset.readOnly,
                         context: 'standalone'
                     });
                     discussionModuleView.render();

@@ -20,6 +20,8 @@
     text-shadow: none;
     font-size: 14px;
     font-weight: 600;
+    word-wrap: break-word;
+    white-space: nowrap;
 
     // Display: block, one button per line, full width
     &.block {

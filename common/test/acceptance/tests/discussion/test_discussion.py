@@ -1037,6 +1037,11 @@ class InlineDiscussionTest(UniqueCourseTest, DiscussionResponsePaginationTestMix
         # Check if 'thread-wrapper' is focused after expanding thread
         self.assertFalse(thread_page.check_if_selector_is_focused(selector='.thread-wrapper'))
 
+    def test_add_a_post_is_present_if_can_create_thread_when_expanded(self):
+        self.discussion_page.expand_discussion()
+        # Add a Post link is present
+        self.assertTrue(self.discussion_page.q(css='.new-post-btn').present)
+
     def test_initial_render(self):
         self.assertFalse(self.discussion_page.is_discussion_expanded())
 
