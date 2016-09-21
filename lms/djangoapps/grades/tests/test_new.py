@@ -246,7 +246,7 @@ class TestMultipleProblemTypesSubsectionScores(ModuleStoreTestCase, ProblemSubmi
     default_problem_metadata = {
         u'graded': True,
         u'weight': 2.5,
-        u'max_score': 5.0,
+        u'max_score': 7.0,
         u'due': datetime.datetime(2099, 3, 15, 12, 30, 0, tzinfo=pytz.utc),
     }
 
@@ -297,6 +297,11 @@ class TestMultipleProblemTypesSubsectionScores(ModuleStoreTestCase, ProblemSubmi
             )
 
     def _get_fresh_subsection_score(self, course_structure, subsection):
+        """
+        Return a Score object for the specified subsection.
+
+        Ensures that a stale cached value is not returned.
+        """
         subsection_factory = SubsectionGradeFactory(
             self.student,
             course_structure=course_structure,
@@ -304,15 +309,27 @@ class TestMultipleProblemTypesSubsectionScores(ModuleStoreTestCase, ProblemSubmi
         )
         return subsection_factory.update(subsection)
 
+    def test_score_submission_for_capa_problems(self):
+        self._add_block_from_xml_file(u'problem', u'capa.xml', parent=self.vert1)
+        course_structure = get_course_blocks(self.student, self.course.location)
+
+        score = self._get_fresh_subsection_score(course_structure, self.seq1)
+        self.assertEqual(score.all_total.earned, 0.0)
+        self.assertEqual(score.all_total.possible, 2.5)
+
+        self.submit_question_answer(u'problem', {u'2_1': u'Correct'})
+        score = self._get_fresh_subsection_score(course_structure, self.seq1)
+        self.assertEqual(score.all_total.earned, 1.25)
+        self.assertEqual(score.all_total.possible, 2.5)
+
     @ddt.data(
-        (u'problem', u'capa.xml'),
-        #(u'openassessment', u'openassessment.xml'),
-        #(u'coderesponse', u'coderesponse.xml'),
-        #(u'lti', u'lti.xml'),
-        #(u'library_content', u'library_content.xml'),
+        (u'openassessment', u'openassessment.xml'),
+        (u'coderesponse', u'coderesponse.xml'),
+        (u'lti', u'lti.xml'),
+        (u'library_content', u'library_content.xml'),
     )
     @ddt.unpack
-    def test_different_problem_types(self, block_type, filename):
+    def test_loading_different_problem_types(self, block_type, filename):
         """
         Test that transformation works for various block types
         """
@@ -325,14 +342,3 @@ class TestMultipleProblemTypesSubsectionScores(ModuleStoreTestCase, ProblemSubmi
         else:
             metadata = None  # Use the default
         self._add_block_from_xml_file(block_type, filename, parent=self.vert1, metadata=metadata)
-        course_structure = get_course_blocks(self.student, self.course.location)
-
-        score = self._get_fresh_subsection_score(course_structure, self.seq1)
-        self.assertEqual(score.all_total.earned, 0.0)
-        self.assertEqual(score.all_total.possible, 2.5)
-
-        self.submit_question_answer(u'problem', {u'2_1': u'Correct'})
-        score = self._get_fresh_subsection_score(course_structure, self.seq1)
-        self.assertEqual(score.all_total.earned, 1.25)
-        self.assertEqual(score.all_total.possible, 2.5)
-        #self.assertEqual(self.look_at_question(u'problem').content, '')
