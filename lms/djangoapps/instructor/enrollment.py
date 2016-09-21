@@ -16,6 +16,7 @@ from course_modes.models import CourseMode
 from student.models import CourseEnrollment, CourseEnrollmentAllowed
 from courseware.models import StudentModule
 from edxmako.shortcuts import render_to_string
+from grades.signals.signals import SCORE_CHANGED
 from lang_pref import LANGUAGE_KEY
 
 from submissions import api as sub_api  # installed from the edx-submissions repository
@@ -244,6 +245,15 @@ def reset_student_attempts(course_id, student, module_state_key, requesting_user
                     requesting_user_id=requesting_user_id
                 )
                 submission_cleared = True
+                SCORE_CHANGED.send(
+                    sender=None,
+                    points_possible=block.max_score,
+                    points_earned=0,
+                    user=student,
+                    course_id=course_id,
+                    usage_id=module_state_key
+                )
+
     except ItemNotFoundError:
         log.warning("Could not find %s in modulestore when attempting to reset attempts.", module_state_key)
 
