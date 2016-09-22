@@ -2,6 +2,7 @@
 Test grade calculation.
 """
 
+import ddt
 from django.http import Http404
 from mock import patch
 from nose.plugins.attrib import attr
@@ -39,6 +40,17 @@ def _grade_with_errors(student, course):
         raise Exception("I don't like {}".format(student.username))
 
     return grades_summary(student, course)
+
+
+def _create_problem_xml():
+    """
+    Creates and returns XML for a multiple choice response problem
+    """
+    return MultipleChoiceResponseXMLFactory().build_xml(
+        question_text='The correct answer is Choice 3',
+        choices=[False, False, True, False],
+        choice_names=['choice_0', 'choice_1', 'choice_2', 'choice_3']
+    )
 
 
 @attr(shard=1)
@@ -140,6 +152,55 @@ class TestGradeIteration(SharedModuleStoreTestCase):
                 students_to_errors[student] = err_msg
 
         return students_to_gradesets, students_to_errors
+
+
+@ddt.ddt
+class TestWeightedProblems(SharedModuleStoreTestCase):
+    """
+    Test scores and grades with various problem weight values.
+    """
+    @classmethod
+    def setUpClass(cls):
+        super(TestWeightedProblems, cls).setUpClass()
+        cls.course = CourseFactory.create()
+        cls.chapter = ItemFactory.create(parent=cls.course, category="chapter", display_name="chapter")
+        cls.sequential = ItemFactory.create(parent=cls.chapter, category="sequential", display_name="sequential")
+        cls.vertical = ItemFactory.create(parent=cls.sequential, category="vertical", display_name="vertical")
+
+    def setUp(self):
+        super(TestWeightedProblems, self).setUp()
+        self.user = UserFactory()
+        self.request = get_request_for_user(self.user)
+
+    @ddt.data((1, 1, 50))
+    @ddt.unpack
+    def test_problem_weight(self, r_earned, r_possible, weight):
+        problem = ItemFactory.create(
+            parent=self.vertical,
+            category="problem",
+            display_name="problem",
+            data=_create_problem_xml(),
+            weight=weight,
+        )
+        course_structure = get_course_blocks(self.request.user, self.course.location)
+
+        answer_problem(self.course, self.request, problem, score=r_earned, max_value=r_possible)
+
+        subsection_grade = SubsectionGradeFactory(
+            self.request.user, self.course, course_structure
+        ).create(self.sequential)
+        problem_score = subsection_grade.locations_to_scores[problem.location]
+        self.assertEquals(problem_score.earned, r_earned / r_possible * weight)
+        self.assertEquals(problem_score.possible, weight)
+        self.assertEquals(problem_score.weight, weight)
+        self.assertEquals(subsection_grade.all_total.earned, r_earned / r_possible * weight)
+        self.assertEquals(subsection_grade.all_total.possible, weight)
+
+    def test_problem_weight_zero(self):
+        pass
+
+    def test_problem_weight_negative(self):
+        pass
 
 
 class TestScoreForModule(SharedModuleStoreTestCase):
@@ -289,11 +350,7 @@ class TestGetModuleScore(LoginEnrollmentTestCase, SharedModuleStoreTestCase):
             category='library_content',
             display_name='Test Library Content'
         )
-        problem_xml = MultipleChoiceResponseXMLFactory().build_xml(
-            question_text='The correct answer is Choice 3',
-            choices=[False, False, True, False],
-            choice_names=['choice_0', 'choice_1', 'choice_2', 'choice_3']
-        )
+        problem_xml = _create_problem_xml()
         cls.problem1 = ItemFactory.create(
             parent=cls.vert1,
             category="problem",
@@ -304,7 +361,7 @@ class TestGetModuleScore(LoginEnrollmentTestCase, SharedModuleStoreTestCase):
             parent=cls.vert1,
             category="problem",
             display_name="Test Problem 2",
-            data=problem_xml
+            data=problem_xml,
         )
         cls.problem3 = ItemFactory.create(
             parent=cls.randomize,

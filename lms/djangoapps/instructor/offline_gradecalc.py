@@ -16,7 +16,7 @@ from django.contrib.auth.models import User
 from lms.djangoapps.grades import course_grades
 from opaque_keys import OpaqueKey
 from opaque_keys.edx.keys import UsageKey
-from xmodule.graders import Score
+from xmodule.graders import ProblemScore, AggregatedScore
 
 from instructor.utils import DummyRequest
 
@@ -55,8 +55,8 @@ def offline_grade_calculation(course_key):
         # Convert Score namedtuples to dicts:
         totaled_scores = gradeset['totaled_scores']
         for section in totaled_scores:
-            totaled_scores[section] = [score._asdict() for score in totaled_scores[section]]
-        gradeset['raw_scores'] = [score._asdict() for score in gradeset['raw_scores']]
+            totaled_scores[section] = [score.__dict__ for score in totaled_scores[section]]
+        gradeset['raw_scores'] = [score.__dict__ for score in gradeset['raw_scores']]
         # Encode as JSON and save:
         gradeset_str = enc.encode(gradeset)
         ocg, _created = models.OfflineComputedGrade.objects.get_or_create(user=student, course_id=course_key)
@@ -102,16 +102,16 @@ def student_grades(student, request, course, use_offline=False):  # pylint: disa
         )
 
     gradeset = json.loads(ocg.gradeset)
-    # Convert score dicts back to Score tuples:
+    # Convert score dicts back to Score objects
 
-    def score_from_dict(encoded):
+    def score_from_dict(encoded, score_class):
         """ Given a formerly JSON-encoded Score tuple, return the Score tuple """
         if encoded['module_id']:
             encoded['module_id'] = UsageKey.from_string(encoded['module_id'])
-        return Score(**encoded)
+        return score_class(**encoded)
 
     totaled_scores = gradeset['totaled_scores']
     for section in totaled_scores:
-        totaled_scores[section] = [score_from_dict(score) for score in totaled_scores[section]]
-    gradeset['raw_scores'] = [score_from_dict(score) for score in gradeset['raw_scores']]
+        totaled_scores[section] = [score_from_dict(score, AggregatedScore) for score in totaled_scores[section]]
+    gradeset['raw_scores'] = [score_from_dict(score, ProblemScore) for score in gradeset['raw_scores']]
     return gradeset

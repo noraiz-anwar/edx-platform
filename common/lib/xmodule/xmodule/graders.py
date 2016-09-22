@@ -14,9 +14,61 @@ from collections import namedtuple
 
 log = logging.getLogger("edx.courseware")
 
-# This is a tuple for holding scores, either from problems or sections.
-# Section either indicates the name of the problem or the name of the section
-Score = namedtuple("Score", "earned possible graded section module_id")
+
+class ScoreBase(object):
+    """
+    Base class for encapsulating fields of values scores.
+    Field common to all scores include:
+        display_name (string) - the display name of the module
+        module_id (UsageKey) - the location of the module
+        graded (boolean) - whether or not this module is graded
+    """
+    def __init__(self, graded, display_name, module_id):
+        self.graded = graded
+        self.display_name = display_name
+        self.module_id = module_id
+
+    def __eq__(self, other):
+        if type(other) is type(self):
+            return self.__dict__ == other.__dict__
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+class ProblemScore(ScoreBase):
+    """
+    Encapsulates the fields of a Problem's score.
+    In addition to the fields in ScoreBase, also includes:
+        r_earned (float) - points earned on this problem
+        r_possible (float) - points possible to earn on this problem
+        w_earned = earned (float) - weighted value of the points earned
+        w_possible = possible (float) - weighted possible points on this problem
+        weight (float) - weight of this problem
+    """
+    def __init__(self, r_earned, r_possible, w_earned, w_possible, weight, *args, **kwargs):
+        super(ProblemScore, self).__init__(*args, **kwargs)
+        self.r_earned = r_earned
+        self.r_possible = r_possible
+        self.earned = w_earned
+        self.possible = w_possible
+        self.weight = weight
+
+
+class AggregatedScore(ScoreBase):
+    """
+    Encapsulates the fields of a Subsection's score.
+    In addition to the fields in ScoreBase, also includes:
+        tw_earned = earned - total aggregated sum of all weighted earned values
+            from its descendants
+        tw_possible = possible - total aggregated sum of all possible values
+            from its descendants
+    """
+    def __init__(self, tw_earned, tw_possible, *args, **kwargs):
+        super(AggregatedScore, self).__init__(*args, **kwargs)
+        self.earned = tw_earned
+        self.possible = tw_possible
 
 
 def float_sum(iterable):
@@ -26,7 +78,7 @@ def float_sum(iterable):
     return float(sum(iterable))
 
 
-def aggregate_scores(scores, section_name="summary", location=None):
+def aggregate_scores(scores, display_name="summary", location=None):
     """
     scores: A list of Score objects
     location: The location under which all objects in scores are located
@@ -41,10 +93,10 @@ def aggregate_scores(scores, section_name="summary", location=None):
     total_possible = float_sum(score.possible for score in scores)
 
     #regardless of whether it is graded
-    all_total = Score(total_correct, total_possible, False, section_name, location)
+    all_total = AggregatedScore(total_correct, total_possible, False, display_name, location)
 
     #selecting only graded things
-    graded_total = Score(total_correct_graded, total_possible_graded, True, section_name, location)
+    graded_total = AggregatedScore(total_correct_graded, total_possible_graded, True, display_name, location)
 
     return all_total, graded_total
 
@@ -220,7 +272,7 @@ class SingleSectionGrader(CourseGrader):
         found_score = None
         if self.type in grade_sheet:
             for score in grade_sheet[self.type]:
-                if score.section == self.name:
+                if score.display_name == self.name:
                     found_score = score
                     break
 
@@ -342,7 +394,7 @@ class AssignmentFormatGrader(CourseGrader):
                 else:
                     earned = scores[i].earned
                     possible = scores[i].possible
-                    section_name = scores[i].section
+                    section_name = scores[i].display_name
 
                 percentage = earned / possible
                 summary_format = u"{section_type} {index} - {name} - {percent:.0%} ({earned:.3n}/{possible:.3n})"

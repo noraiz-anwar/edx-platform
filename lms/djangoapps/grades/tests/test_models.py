@@ -67,8 +67,8 @@ class GradesModelTestCase(TestCase):
             block_type='problem',
             block_id='block_id_b'
         )
-        self.record_a = BlockRecord(locator=self.locator_a, weight=1, max_score=10)
-        self.record_b = BlockRecord(locator=self.locator_b, weight=1, max_score=10)
+        self.record_a = BlockRecord(locator=self.locator_a, weight=1, r_possible=10)
+        self.record_b = BlockRecord(locator=self.locator_b, weight=1, r_possible=10)
 
 
 @ddt.ddt
@@ -84,11 +84,11 @@ class BlockRecordTest(GradesModelTestCase):
         Tests creation of a BlockRecord.
         """
         weight = 1
-        max_score = 10
+        r_possible = 10
         record = BlockRecord(
             self.locator_a,
             weight,
-            max_score,
+            r_possible,
         )
         self.assertEqual(record.locator, self.locator_a)
 
@@ -98,15 +98,15 @@ class BlockRecordTest(GradesModelTestCase):
         ("BlockRecord is", "a dumb data store", "with no validation"),
     )
     @ddt.unpack
-    def test_serialization(self, weight, max_score, block_key):
+    def test_serialization(self, weight, r_possible, block_key):
         """
         Tests serialization of a BlockRecord using the to_dict() method.
         """
-        record = BlockRecord(block_key, weight, max_score)
+        record = BlockRecord(block_key, weight, r_possible)
         expected = OrderedDict([
             ("locator", block_key),
             ("weight", weight),
-            ("max_score", max_score),
+            ("r_possible", r_possible),
         ])
         self.assertEqual(expected, record._asdict())
 
@@ -132,7 +132,7 @@ class VisibleBlocksTest(GradesModelTestCase):
         expected_data = {
             'course_key': unicode(self.record_a.locator.course_key),
             'blocks': [
-                {'locator': unicode(self.record_a.locator), 'max_score': 10, 'weight': 1},
+                {'locator': unicode(self.record_a.locator), 'r_possible': 10, 'weight': 1},
             ],
         }
         expected_json = json.dumps(expected_data, separators=(',', ':'), sort_keys=True)

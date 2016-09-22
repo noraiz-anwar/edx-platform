@@ -5,6 +5,8 @@ from logging import getLogger
 
 from openedx.core.lib.cache_utils import memoized
 from xblock.core import XBlock
+from xmodule import block_metadata_utils
+from xmodule.graders import ProblemScore
 from .transformer import GradesTransformer
 
 
@@ -41,11 +43,12 @@ def weighted_score(raw_earned, raw_possible, weight=None):
     If weight is None or raw_possible is 0, returns the original values.
     """
     if weight is None or raw_possible == 0:
-        return (raw_earned, raw_possible)
-    return float(raw_earned) * weight / raw_possible, float(weight)
+        return raw_earned, raw_possible
+    else:
+        return float(raw_earned) * weight / raw_possible, float(weight)
 
 
-def get_score(user, block, scores_client, submissions_scores_cache, weight, possible=None):
+def get_score(scores_client, submissions_scores_cache, block, persisted_block=None):
     """
     Return the score for a user on a problem, as a tuple (earned, possible).
     e.g. (5,7) if you got 5 out of 7 points.
@@ -54,30 +57,59 @@ def get_score(user, block, scores_client, submissions_scores_cache, weight, poss
     None).
 
     user: a Student object
-    block: a BlockStructure's BlockData object
     scores_client: an initialized ScoresClient
     submissions_scores_cache: A dict of location names to (earned, possible)
         point tuples.  If an entry is found in this cache, it takes precedence.
-    weight: The weight of the problem to use in the calculation.  A value of
-        None signifies that the weight should not be applied.
-    possible (optional): The possible maximum score of the problem to use in the
-        calculation.  If None, uses the value found either in scores_client or
-        from the block.
+    block: a BlockStructure's BlockData object
+    persisted_block: a BlockRecord, if found from the database.
     """
-    submissions_scores_cache = submissions_scores_cache or {}
+    weight = block.weight if persisted_block else getattr(block, 'weight', None)
 
-    if not user.is_authenticated():
-        return (None, None)
+    r_earned, r_possible, w_earned, w_possible = (
+        _get_from_submissions(submissions_scores_cache, block) or
+        _get_from_courseware_student_module(scores_client, block, weight) or
+        _get_from_block(persisted_block, block, weight)
+    )
 
-    location_url = unicode(block.location)
-    if location_url in submissions_scores_cache:
-        return submissions_scores_cache[location_url]
+    if w_earned is not None or w_possible is not None:
+        # There's a chance that the value of graded is not the same
+        # value when the problem was scored. Since we get the value
+        # from the block_structure.
+        #
+        if w_possible is not None and w_possible > 0:
+            # cannot grade a problem with an invalid denominator
+            graded = _get_explicit_graded(block)
+        else:
+            graded = False
 
-    if not getattr(block, 'has_score', False):
-        # These are not problems, and do not have a score
-        return (None, None)
+        return ProblemScore(
+            r_earned,
+            r_possible,
+            w_earned,
+            w_possible,
+            weight,
+            graded,
+            display_name=block_metadata_utils.display_name_with_default_escaped(block),
+            module_id=block.location,
+        )
 
-    # Check the score that comes from the ScoresClient (out of CSM).
+
+def _get_from_submissions(submissions_scores_cache, block):
+    """
+    Returns the score values from the submissions API if found.
+    """
+    if submissions_scores_cache:
+        submission_value = submissions_scores_cache.get(unicode(block.location))
+        if submission_value:
+            w_earned, w_possible = submission_value
+            return (None, None) + (w_earned, w_possible)
+
+
+def _get_from_courseware_student_module(scores_client, block, weight):
+    """
+    Returns the score values from the courseware student module, via
+    ScoresClient, if found.
+    """
     # If an entry exists and has a total associated with it, we trust that
     # value. This is important for cases where a student might have seen an
     # older version of the problem -- they're still graded on what was possible
@@ -85,21 +117,39 @@ def get_score(user, block, scores_client, submissions_scores_cache, weight, poss
     score = scores_client.get(block.location)
     if score and score.total is not None:
         # We have a valid score, just use it.
-        earned = score.correct if score.correct is not None else 0.0
-        if possible is None:
-            possible = score.total
-        elif possible != score.total:
-            log.error(u"Persisted Grades: possible value {} != score.total value {}".format(possible, score.total))
+        r_earned = score.correct if score.correct is not None else 0.0
+        r_possible = score.total
+        return (r_earned, r_possible) + weighted_score(r_earned, r_possible, weight)
+
+
+def _get_from_block(persisted_block, block, weight):
+    """
+    Returns the score values, assuming the earned score is 0.0.
+    Gets the r_possible data from the persisted_block or the
+    given block, in that order.
+    """
+    r_earned = 0.0
+    r_possible = persisted_block.r_possible if persisted_block else block.transformer_data[GradesTransformer].max_score
+    if r_possible is None:
+        w_earned, w_possible = None, None
     else:
-        # This means we don't have a valid score entry and we don't have a
-        # cached_max_score on hand. We know they've earned 0.0 points on this.
-        earned = 0.0
-        if possible is None:
-            possible = block.transformer_data[GradesTransformer].max_score
+        w_earned, w_possible = weighted_score(r_earned, r_possible, weight)
 
-        # Problem may be an error module (if something in the problem builder failed)
-        # In which case possible might be None
-        if possible is None:
-            return (None, None)
+    return r_earned, r_possible, w_earned, w_possible
 
-    return weighted_score(earned, possible, weight)
+
+def _get_explicit_graded(block):
+    """
+    Returns the explicit graded field value for the given block
+    """
+    field_value = getattr(
+        block.transformer_data[GradesTransformer],
+        GradesTransformer.EXPLICIT_GRADED_FIELD_NAME,
+        None,
+    )
+
+    # Set to True if grading is not explicitly disabled for
+    # this block.  This allows us to include the block's score
+    # in the aggregated self.graded_total, regardless of the
+    # inherited graded value from the subsection. (TNL-5560)
+    return True if field_value is None else field_value

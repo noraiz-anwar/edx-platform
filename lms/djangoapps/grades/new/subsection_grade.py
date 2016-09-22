@@ -11,12 +11,11 @@ from courseware.model_data import ScoresClient
 from lms.djangoapps.grades.scores import get_score, possibly_scored
 from lms.djangoapps.grades.models import BlockRecord, PersistentSubsectionGrade
 from lms.djangoapps.grades.config.models import PersistentGradesEnabledFlag
-from lms.djangoapps.grades.transformer import GradesTransformer
 from student.models import anonymous_id_for_user, User
 from submissions import api as submissions_api
 from traceback import format_exc
 from xmodule import block_metadata_utils, graders
-from xmodule.graders import Score
+from xmodule.graders import AggregatedScore
 
 
 log = getLogger(__name__)
@@ -54,7 +53,7 @@ class SubsectionGrade(object):
 
         self.graded_total = None  # aggregated grade for all graded problems
         self.all_total = None  # aggregated grade for all problems, regardless of whether they are graded
-        self.locations_to_weighted_scores = OrderedDict()  # dict of problem locations to (Score, weight) tuples
+        self.locations_to_scores = OrderedDict()  # dict of problem locations to ProblemScore
 
         self._scores = None
 
@@ -64,7 +63,7 @@ class SubsectionGrade(object):
         List of all problem scores in the subsection.
         """
         if self._scores is None:
-            self._scores = [score for score, _ in self.locations_to_weighted_scores.itervalues()]
+            self._scores = self.locations_to_scores.itervalues()
         return self._scores
 
     def init_from_structure(self, student, course_structure, scores_client, submissions_scores):
@@ -76,9 +75,8 @@ class SubsectionGrade(object):
                 filter_func=possibly_scored,
                 start_node=self.location,
         ):
-            self._compute_block_score(
-                student, descendant_key, course_structure, scores_client, submissions_scores, persisted_values={},
-            )
+            self._compute_block_score(descendant_key, course_structure, scores_client, submissions_scores)
+
         self.all_total, self.graded_total = graders.aggregate_scores(self.scores, self.display_name, self.location)
         self._log_event(log.warning, u"init_from_structure", student)
 
@@ -88,28 +86,20 @@ class SubsectionGrade(object):
         """
         assert self._scores is None
         for block in model.visible_blocks.blocks:
-            persisted_values = {'weight': block.weight, 'possible': block.max_score}
-            self._compute_block_score(
-                student,
-                block.locator,
-                course_structure,
-                scores_client,
-                submissions_scores,
-                persisted_values
-            )
+            self._compute_block_score(block.locator, course_structure, scores_client, submissions_scores, block)
 
-        self.graded_total = Score(
-            earned=model.earned_graded,
-            possible=model.possible_graded,
+        self.graded_total = AggregatedScore(
+            tw_earned=model.earned_graded,
+            tw_possible=model.possible_graded,
             graded=True,
-            section=self.display_name,
+            display_name=self.display_name,
             module_id=self.location,
         )
-        self.all_total = Score(
-            earned=model.earned_all,
-            possible=model.possible_all,
+        self.all_total = AggregatedScore(
+            tw_earned=model.earned_all,
+            tw_possible=model.possible_all,
             graded=False,
-            section=self.display_name,
+            display_name=self.display_name,
             module_id=self.location,
         )
         self._log_event(log.warning, u"init_from_model", student)
@@ -140,12 +130,11 @@ class SubsectionGrade(object):
 
     def _compute_block_score(
             self,
-            student,
             block_key,
             course_structure,
             scores_client,
             submissions_scores,
-            persisted_values,
+            persisted_block=None,
     ):
         """
         Compute score for the given block. If persisted_values
@@ -154,54 +143,14 @@ class SubsectionGrade(object):
         block = course_structure[block_key]
 
         if getattr(block, 'has_score', False):
-
-            possible = persisted_values.get('possible', None)
-            weight = persisted_values.get('weight', getattr(block, 'weight', None))
-
-            (earned, possible) = get_score(
-                student,
-                block,
+            problem_score = get_score(
                 scores_client,
                 submissions_scores,
-                weight,
-                possible,
+                block,
+                persisted_block,
             )
-
-            if earned is not None or possible is not None:
-                # There's a chance that the value of graded is not the same
-                # value when the problem was scored. Since we get the value
-                # from the block_structure.
-                #
-                # Cannot grade a problem with a denominator of 0.
-                # TODO: None > 0 is not python 3 compatible.
-                block_graded = self._get_explicit_graded(block, course_structure) if possible > 0 else False
-
-                self.locations_to_weighted_scores[block.location] = (
-                    Score(
-                        earned,
-                        possible,
-                        block_graded,
-                        block_metadata_utils.display_name_with_default_escaped(block),
-                        block.location,
-                    ),
-                    weight,
-                )
-
-    def _get_explicit_graded(self, block, course_structure):
-        """
-        Returns the explicit graded field value for the given block
-        """
-        field_value = course_structure.get_transformer_block_field(
-            block.location,
-            GradesTransformer,
-            GradesTransformer.EXPLICIT_GRADED_FIELD_NAME
-        )
-
-        # Set to True if grading is not explicitly disabled for
-        # this block.  This allows us to include the block's score
-        # in the aggregated self.graded_total, regardless of the
-        # inherited graded value from the subsection. (TNL-5560)
-        return True if field_value is None else field_value
+            if problem_score:
+                self.locations_to_scores[block_key] = problem_score
 
     def _persisted_model_params(self, student):
         """
@@ -226,9 +175,9 @@ class SubsectionGrade(object):
         Returns the list of visible blocks.
         """
         return [
-            BlockRecord(location, weight, score.possible)
-            for location, (score, weight) in
-            self.locations_to_weighted_scores.iteritems()
+            BlockRecord(location, score.weight, score.r_possible)
+            for location, score in
+            self.locations_to_scores.iteritems()
         ]
 
     def _log_event(self, log_func, log_statement, student):
