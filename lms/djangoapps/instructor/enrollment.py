@@ -269,7 +269,7 @@ def reset_student_attempts(course_id, student, module_state_key, requesting_user
 
     if delete_module:
         module_to_reset.delete()
-        if block:
+        if block and block.has_score:
             SCORE_CHANGED.send(
                 sender=None,
                 points_possible=block.max_score,
