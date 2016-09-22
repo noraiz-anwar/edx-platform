@@ -17,7 +17,7 @@ $learn-more-horizontal-position: calc(50% - 100px); // calculate the left positi
 
       .courses-listing-item {
         margin: 0 0 ($baseline*1.5) 0;
-        height: $course-card-height;
+        max-height: $course-card-height;
       }
     }
 
@@ -49,7 +49,7 @@ $learn-more-horizontal-position: calc(50% - 100px); // calculate the left positi
 
         img {
           width: 100%;
-          min-height: $course-image-height;
+          height: auto;
         }
 
         .learn-more {
