@@ -246,6 +246,7 @@ def reset_student_attempts(course_id, student, module_state_key, requesting_user
                 )
                 submission_cleared = True
     except ItemNotFoundError:
+        block = None
         log.warning("Could not find %s in modulestore when attempting to reset attempts.", module_state_key)
 
     # Reset the student's score in the submissions API, if xblock.clear_student_state has not done so already.
