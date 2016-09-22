@@ -140,10 +140,13 @@ class VisibleBlocks(models.Model):
     """
     blocks_json = models.TextField()
     hashed = models.CharField(max_length=100, unique=True)
-    course_id = CourseKeyField(blank=False, max_length=255, db_index=True)
+    course_id = CourseKeyField(blank=False, max_length=255)
     version = models.IntegerField()
 
     objects = VisibleBlocksQuerySet.as_manager()
+
+    class Meta(object):
+        index_together = [(u'version', u'course_id')]
 
     def __unicode__(self):
         """
@@ -167,7 +170,7 @@ class VisibleBlocks(models.Model):
         Arguments:
             course_key: The course identifier for the desired records
         """
-        return cls.objects.filter(course_id=course_key)
+        return cls.objects.filter(course_id=course_key, version=VISIBLE_BLOCKS_VERSION)
 
     @classmethod
     def bulk_create(cls, block_record_lists):
