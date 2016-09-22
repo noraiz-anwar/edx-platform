@@ -33,7 +33,10 @@ class BlockRecordListTestCase(TestCase):
         )
 
     def test_empty_block_record_set(self):
-        empty_json = u'{0}"blocks":[],"course_key":"{1}","version":1{2}'.format(u'{', unicode(self.course_key), u'}')
+        empty_json = u'{"blocks":[],"course_key":"%s","version":%s}' % (
+            unicode(self.course_key),
+            BLOCK_RECORD_LIST_VERSION,
+        )
 
         brs = BlockRecordList((), self.course_key)
         self.assertFalse(brs)
