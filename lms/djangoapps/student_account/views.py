@@ -3,11 +3,12 @@
 import logging
 import json
 import urlparse
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse, resolve
 from django.http import (
     HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpRequest
@@ -16,8 +17,14 @@ from django.shortcuts import redirect
 from django.utils.translation import ugettext as _
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
+from django.utils import timezone
 from django_countries import countries
 from edxmako.shortcuts import render_to_response
+from provider.oauth2.models import (
+    Client,
+    AccessToken,
+    RefreshToken
+)
 import pytz
 
 from commerce.models import CommerceConfiguration
@@ -171,6 +178,7 @@ def password_change_request_handler(request):
     if email:
         try:
             request_password_change(email, request.get_host(), request.is_secure())
+            _invalidate_access_token(user, email)
         except UserNotFound:
             AUDIT_LOG.info("Invalid password reset attempt")
             # Increment the rate limit counter
@@ -307,6 +315,20 @@ def _external_auth_intercept(request, mode):
         return external_auth_login(request)
     elif mode == "register":
         return external_auth_register(request)
+
+
+def _invalidate_access_token(user, email):
+    user = User.objects.get(email=email) if not user.is_authenticated() else user
+    clients = Client.objects.all()
+    import pudb; pu.db
+    for client in clients:
+        access_tokens = AccessToken.objects.filter(
+            user=user, client=client, expires__gt=timezone.now()
+        )
+        for access_token in access_tokens:
+            RefreshToken.objects.create(user=user, access_token=access_token, client=client)
+            access_token.expires = timezone.now() - timedelta(milliseconds=1)
+            access_token.save()
 
 
 def get_user_orders(user):
