@@ -124,9 +124,9 @@ class TemplateTestCase(unittest.TestCase):
         self.assertGreater(len(element_list), 0, "Could not find element at '%s'" % str(xpath))
 
         if exact:
-            self.assertEqual(text, element_list[0].text)
+            self.assertEqual(text, element_list[0].text.strip())
         else:
-            self.assertIn(text, element_list[0].text)
+            self.assertIn(text, element_list[0].text.strip())
 
     def assert_description(self, describedby_xpaths):
         """
@@ -858,7 +858,7 @@ class OptionInputTemplateTest(TemplateTestCase):
     def test_select_options(self):
 
         # Create options 0-4, and select option 2
-        self.context['options'] = [(id_num, '<b>Option {0}</b>'.format(id_num))
+        self.context['options'] = [(id_num, 'Option {0}'.format(id_num))
                                    for id_num in range(5)]
         self.context['value'] = 2
 
@@ -868,15 +868,12 @@ class OptionInputTemplateTest(TemplateTestCase):
         xpath = "//option[@value='option_2_dummy_default']"
         self.assert_has_xpath(xml, xpath, self.context)
 
-        # Should have each of the options, with the correct description
-        # The description HTML should NOT be escaped
-        # (that's why we descend into the <b> tag)
         for id_num in range(5):
-            xpath = "//option[@value='{0}']/b".format(id_num)
+            xpath = "//option[@value='{0}']".format(id_num)
             self.assert_has_text(xml, xpath, 'Option {0}'.format(id_num))
 
         # Should have the correct option selected
-        xpath = "//option[@selected='true']/b"
+        xpath = "//option[@selected='true']"
         self.assert_has_text(xml, xpath, 'Option 2')
 
     def test_status(self):
