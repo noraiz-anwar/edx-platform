@@ -2,8 +2,6 @@
 """
 Dashboard with Shopping Cart History tests with configuration overrides.
 """
-import mock
-
 from django.core.urlresolvers import reverse
 
 from mock import patch
@@ -15,24 +13,11 @@ from shoppingcart.models import (
 )
 from student.tests.factories import UserFactory
 from course_modes.models import CourseMode
-
-
-def fake_all_orgs(default=None):  # pylint: disable=unused-argument
-    """
-    Method to return fake orgs,
-    """
-    return set(['fakeX', 'fooX'])
-
-
-def fake_site(name, default=None):  # pylint: disable=unused-argument
-    """
-    Method to return a fake site name.
-    """
-    return 'fakeX'
+from openedx.core.djangoapps.site_configuration.tests.mixins import SiteMixin
 
 
 @patch.dict('django.conf.settings.FEATURES', {'ENABLE_PAID_COURSE_REGISTRATION': True})
-class TestOrderHistoryOnSiteDashboard(ModuleStoreTestCase):
+class TestOrderHistoryOnSiteDashboard(SiteMixin, ModuleStoreTestCase):
     """
     Test for dashboard order history site configuration overrides.
     """
