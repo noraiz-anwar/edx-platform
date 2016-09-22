@@ -176,18 +176,16 @@ from django.utils.http import urlquote_plus
                                             <em>${due_date | h}</em>
                                         </p>
                                         %endif
-                                        <div class="scores">
+                                        <dl class="scores">
                                             %if len(section.scores) > 0:
-                                            <h6 class="hd hd-6">${ _("Problem Scores: ") if section.graded else _("Practice Scores: ")}</h6>
-                                            <ol>
-                                                %for score in section.scores:
-                                                <li>${"{0:.3n}/{1:.3n}".format(float(score.earned),float(score.possible)) | h}</li>
-                                                %endfor
-                                            </ol>
+                                            <dt class="hd hd-6">${ _("Problem Scores: ") if section.graded else _("Practice Scores: ")}</dt>
+                                            %for score in section.scores:
+                                            <dd>${"{0:.3n}/{1:.3n}".format(float(score.earned),float(score.possible)) | h}</dd>
+                                            %endfor
                                             %else:
                                             <p class="no-scores">${_("No problem scores in this section")}</p>
                                             %endif
-                                        </div>
+                                        </dl>
                                     </div>
                                 %endfor
                             </div>

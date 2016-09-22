@@ -246,7 +246,7 @@
       margin-top: lh();
       padding-left: 0;
 
-      > div {
+      > section {
         @extend .clearfix;
         border-bottom: 1px solid #e3e3e3;
         display: table;
@@ -267,10 +267,11 @@
           padding-right: flex-gutter(9);
           text-transform: none;
           width: flex-grid(2, 9);
+          vertical-align: top;
         }
 
         .sections {
-          display: table-cell;
+          display: inline-block;
           @include padding-left(flex-gutter(9));
           width: flex-grid(7, 9);
 
@@ -303,27 +304,24 @@
             .scores {
               margin: lh(0.5) 0;
 
-              .hd {
+              dt {
                 display: inline-block;
                 width: auto;
                 margin: initial;
+                @include margin-right($baseline);
                 border: initial;
                 padding: initial;
                 font-size: em(14);
               }
 
-              ol {
-                list-style: none;
-                margin: 0;
-                padding: 0;
+              dd {
                 display: inline-block;
-
-                li {
-                  display: inline-block;
-                  font-size: em(14);
-                  font-weight: normal;
-                  padding-right: 1em;
-                }
+                margin: 0;
+                @include margin-right($baseline);
+                padding-right: 1em;
+                font-size: em(14);
+                font-weight: normal;
+                color: $gray-d2;
               }
             }
           }
