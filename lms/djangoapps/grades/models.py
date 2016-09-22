@@ -23,6 +23,8 @@ from xmodule_django.models import CourseKeyField, UsageKeyField
 log = logging.getLogger(__name__)
 
 
+VISIBLE_BLOCKS_VERSION = 1
+
 # Used to serialize information about a block at the time it was used in
 # grade calculation.
 BlockRecord = namedtuple('BlockRecord', ['locator', 'weight', 'max_score'])
@@ -121,6 +123,7 @@ class VisibleBlocksQuerySet(models.QuerySet):
         """
         model, _ = self.get_or_create(
             hashed=blocks.hash_value,
+            version=VISIBLE_BLOCKS_VERSION,
             defaults={'blocks_json': blocks.json_value, 'course_id': blocks.course_key},
         )
         return model
@@ -138,6 +141,7 @@ class VisibleBlocks(models.Model):
     blocks_json = models.TextField()
     hashed = models.CharField(max_length=100, unique=True)
     course_id = CourseKeyField(blank=False, max_length=255, db_index=True)
+    version = models.IntegerField()
 
     objects = VisibleBlocksQuerySet.as_manager()
 
@@ -145,7 +149,7 @@ class VisibleBlocks(models.Model):
         """
         String representation of this model.
         """
-        return u"VisibleBlocks object - hash:{}, raw json:'{}'".format(self.hashed, self.blocks_json)
+        return u"VisibleBlocks v{} object - hash:{}, raw json:'{}'".format(self.version, self.hashed, self.blocks_json)
 
     @property
     def blocks(self):
@@ -176,6 +180,7 @@ class VisibleBlocks(models.Model):
                 blocks_json=brl.json_value,
                 hashed=brl.hash_value,
                 course_id=brl.course_key,
+                version=VISIBLE_BLOCKS_VERSION,
             )
             for brl in block_record_lists
         ])
