@@ -14,6 +14,7 @@ from opaque_keys.edx.locator import CourseLocator, BlockUsageLocator
 from lms.djangoapps.grades.models import (
     BlockRecord,
     BlockRecordList,
+    BLOCK_RECORD_LIST_VERSION,
     PersistentSubsectionGrade,
     VisibleBlocks
 )
@@ -100,7 +101,7 @@ class BlockRecordTest(GradesModelTestCase):
     @ddt.unpack
     def test_serialization(self, weight, max_score, block_key):
         """
-        Tests serialization of a BlockRecord using the to_dict() method.
+        Tests serialization of a BlockRecord using the _asdict() method.
         """
         record = BlockRecord(block_key, weight, max_score)
         expected = OrderedDict([
@@ -130,11 +131,9 @@ class VisibleBlocksTest(GradesModelTestCase):
         for block_dict in list_of_block_dicts:
             block_dict['locator'] = unicode(block_dict['locator'])  # BlockUsageLocator is not json-serializable
         expected_data = {
+            'blocks': [{'locator': unicode(self.record_a.locator), 'max_score': 10, 'weight': 1}],
             'course_key': unicode(self.record_a.locator.course_key),
-            'blocks': [
-                {'locator': unicode(self.record_a.locator), 'max_score': 10, 'weight': 1},
-            ],
-            'version': 1,
+            'version': BLOCK_RECORD_LIST_VERSION,
         }
         expected_json = json.dumps(expected_data, separators=(',', ':'), sort_keys=True)
         expected_hash = b64encode(sha1(expected_json).digest())
