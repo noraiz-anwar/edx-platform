@@ -144,7 +144,7 @@ from django.utils.http import urlquote_plus
                     <h3 class="hd hd-4 sr">${_('Details for each chapter')}</h3>
                     %for chapter in courseware_summary:
                         %if not chapter['display_name'] == "hidden":
-                        <div>
+                        <section aria-labelledby="chapter_${loop.index}">
                             <h4 class="hd hd-4" id="chapter_${loop.index}">${ chapter['display_name'] | h}</h4>
                             <div class="sections">
                                 %for section in chapter['sections']:
@@ -191,7 +191,7 @@ from django.utils.http import urlquote_plus
                                     </div>
                                 %endfor
                             </div>
-                        </div>
+                        </section>
                         %endif
                     %endfor
                 </section>
