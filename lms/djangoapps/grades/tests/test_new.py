@@ -318,6 +318,19 @@ class TestMultipleProblemTypesSubsectionScores(ModuleStoreTestCase, ProblemSubmi
         metadata.update(alterations)
         return metadata
 
+    def _get_score_with_alterations(self, alterations):
+        """
+        Given a dict of alterations to the default_problem_metadata, return
+        the score when one correct problem (out of two) is submitted.
+        """
+        metadata = self._get_altered_metadata(alterations)
+
+        self._add_block_from_xml_file(u'problem', u'capa.xml', parent=self.vert1, metadata=metadata)
+        course_structure = get_course_blocks(self.student, self.course.location)
+
+        self.submit_question_answer(u'problem', {u'2_1': u'Correct'})
+        return self._get_fresh_subsection_score(course_structure, self.seq1)
+
     def test_score_submission_for_capa_problems(self):
         self._add_block_from_xml_file(u'problem', u'capa.xml', parent=self.vert1)
         course_structure = get_course_blocks(self.student, self.course.location)
@@ -353,32 +366,39 @@ class TestMultipleProblemTypesSubsectionScores(ModuleStoreTestCase, ProblemSubmi
         self._add_block_from_xml_file(block_type, filename, parent=self.vert1, metadata=metadata)
 
     @ddt.data(
+        ({}, 1.25, 2.5),
         ({u'weight': 27}, 13.5, 27),
         ({u'weight': 1.0}, 0.5, 1.0),
         ({u'weight': 0.0}, 0.0, 0.0),
         ({u'weight': None}, 1.0, 2.0),
-        ({u'graded': False}, 1.25, 2.5),
-        ({u'max_score': 99.3}, 1.25, 2.5),
-        ({u'max_score': 1.0}, 1.25, 2.5),
-        ({u'max_score': 0.0}, 1.25, 2.5),
-        ({u'max_score': None}, 1.25, 2.5),
     )
     @ddt.unpack
-    def test_metadata_alterations(self, alterations, expected_earned, expected_possible):
-        metadata = self._get_altered_metadata(alterations)
-
-        self._add_block_from_xml_file(u'problem', u'capa.xml', parent=self.vert1, metadata=metadata)
-        course_structure = get_course_blocks(self.student, self.course.location)
-
-        self.submit_question_answer(u'problem', {u'2_1': u'Correct'})
-        score = self._get_fresh_subsection_score(course_structure, self.seq1)
-
+    def test_weight_metadata_alterations(self, alterations, expected_earned, expected_possible):
+        score = self._get_score_with_alterations(alterations)
         self.assertEqual(score.all_total.earned, expected_earned)
         self.assertEqual(score.all_total.possible, expected_possible)
 
-        if metadata[u'graded']:
-            self.assertEqual(score.graded_total.earned, expected_earned)
-            self.assertEqual(score.graded_total.possible, expected_possible)
-        else:
-            self.assertEqual(score.graded_total.earned, 0.0)
-            self.assertEqual(score.graded_total.possible, 0.0)
+
+    @ddt.data(
+        ({u'graded': True}, 1.25, 2.5),
+        ({u'graded': False}, 0.0, 0.0),
+    )
+    @ddt.unpack
+    def test_graded_metadata_alterations(self, alterations, expected_earned, expected_possible):
+        score = self._get_score_with_alterations(alterations)
+        self.assertEqual(score.graded_total.earned, expected_earned)
+        self.assertEqual(score.graded_total.possible, expected_possible)
+
+    @ddt.data(
+        {u'max_score': 99.3},
+        {u'max_score': 1.0},
+        {u'max_score': 0.0},
+        {u'max_score': None},
+    )
+    def test_max_score_does_not_change_results(self, alterations):
+        expected_earned = 1.25
+        expected_possible = 2.5
+        score = self._get_score_with_alterations(alterations)
+        self.assertEqual(score.all_total.earned, expected_earned)
+        self.assertEqual(score.all_total.possible, expected_possible)
+
