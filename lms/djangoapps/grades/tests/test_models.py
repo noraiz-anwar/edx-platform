@@ -140,6 +140,7 @@ class VisibleBlocksTest(GradesModelTestCase):
         self.assertEqual(expected_data, json.loads(vblocks.blocks_json))
         self.assertEqual(expected_json, vblocks.blocks_json)
         self.assertEqual(expected_hash, vblocks.hashed)
+        self.assertEqual(1, vblocks.version)
 
     def test_ordering_matters(self):
         """
