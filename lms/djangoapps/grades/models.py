@@ -23,7 +23,7 @@ from xmodule_django.models import CourseKeyField, UsageKeyField
 log = logging.getLogger(__name__)
 
 
-VISIBLE_BLOCKS_VERSION = 1
+BLOCK_RECORD_VERSION = 1
 
 # Used to serialize information about a block at the time it was used in
 # grade calculation.
@@ -35,12 +35,13 @@ class BlockRecordList(tuple):
     An immutable ordered list of BlockRecord objects.
     """
 
-    def __new__(cls, blocks, course_key):  # pylint: disable=unused-argument
+    def __new__(cls, blocks, course_key, version=None):  # pylint: disable=unused-argument
         return super(BlockRecordList, cls).__new__(cls, blocks)
 
-    def __init__(self, blocks, course_key):
+    def __init__(self, blocks, course_key, version=None):
         super(BlockRecordList, self).__init__(blocks)
         self.course_key = course_key
+        self.version = version or BLOCK_RECORD_VERSION
 
     def __eq__(self, other):
         assert isinstance(other, BlockRecordList)
@@ -75,8 +76,9 @@ class BlockRecordList(tuple):
         for block_dict in list_of_block_dicts:
             block_dict['locator'] = unicode(block_dict['locator'])  # BlockUsageLocator is not json-serializable
         data = {
-            'course_key': unicode(self.course_key),
-            'blocks': list_of_block_dicts,
+            u'course_key': unicode(self.course_key),
+            u'blocks': list_of_block_dicts,
+            u'version': self.version,
         }
         return json.dumps(
             data,
@@ -100,7 +102,7 @@ class BlockRecordList(tuple):
             )
             for block in block_dicts
         )
-        return cls(record_generator, course_key)
+        return cls(record_generator, course_key, version=data['version'])
 
     @classmethod
     def from_list(cls, blocks, course_key):
@@ -123,8 +125,10 @@ class VisibleBlocksQuerySet(models.QuerySet):
         """
         model, _ = self.get_or_create(
             hashed=blocks.hash_value,
-            version=VISIBLE_BLOCKS_VERSION,
-            defaults={'blocks_json': blocks.json_value, 'course_id': blocks.course_key},
+            defaults={
+                u'blocks_json': blocks.json_value,
+                u'course_id': blocks.course_key,
+            },
         )
         return model
 
@@ -140,19 +144,15 @@ class VisibleBlocks(models.Model):
     """
     blocks_json = models.TextField()
     hashed = models.CharField(max_length=100, unique=True)
-    course_id = CourseKeyField(blank=False, max_length=255)
-    version = models.IntegerField()
+    course_id = CourseKeyField(blank=False, max_length=255, db_index=True)
 
     objects = VisibleBlocksQuerySet.as_manager()
-
-    class Meta(object):
-        index_together = [(u'version', u'course_id')]
 
     def __unicode__(self):
         """
         String representation of this model.
         """
-        return u"VisibleBlocks v{} object - hash:{}, raw json:'{}'".format(self.version, self.hashed, self.blocks_json)
+        return u"VisibleBlocks object - hash:{}, raw json:'{}'".format(self.hashed, self.blocks_json)
 
     @property
     def blocks(self):
@@ -170,7 +170,7 @@ class VisibleBlocks(models.Model):
         Arguments:
             course_key: The course identifier for the desired records
         """
-        return cls.objects.filter(course_id=course_key, version=VISIBLE_BLOCKS_VERSION)
+        return cls.objects.filter(course_id=course_key)
 
     @classmethod
     def bulk_create(cls, block_record_lists):
@@ -183,7 +183,6 @@ class VisibleBlocks(models.Model):
                 blocks_json=brl.json_value,
                 hashed=brl.hash_value,
                 course_id=brl.course_key,
-                version=VISIBLE_BLOCKS_VERSION,
             )
             for brl in block_record_lists
         ])

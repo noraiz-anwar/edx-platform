@@ -32,7 +32,7 @@ class BlockRecordListTestCase(TestCase):
         )
 
     def test_empty_block_record_set(self):
-        empty_json = '{0}"blocks":[],"course_key":"{1}"{2}'.format('{', unicode(self.course_key), '}')
+        empty_json = u'{0}"blocks":[],"course_key":"{1}","version":1{2}'.format(u'{', unicode(self.course_key), u'}')
 
         brs = BlockRecordList((), self.course_key)
         self.assertFalse(brs)
@@ -134,13 +134,13 @@ class VisibleBlocksTest(GradesModelTestCase):
             'blocks': [
                 {'locator': unicode(self.record_a.locator), 'max_score': 10, 'weight': 1},
             ],
+            'version': 1,
         }
         expected_json = json.dumps(expected_data, separators=(',', ':'), sort_keys=True)
         expected_hash = b64encode(sha1(expected_json).digest())
         self.assertEqual(expected_data, json.loads(vblocks.blocks_json))
         self.assertEqual(expected_json, vblocks.blocks_json)
         self.assertEqual(expected_hash, vblocks.hashed)
-        self.assertEqual(1, vblocks.version)
 
     def test_ordering_matters(self):
         """
