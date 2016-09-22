@@ -318,9 +318,11 @@ def _external_auth_intercept(request, mode):
 
 
 def _invalidate_access_token(user, email):
+    """
+    Given a user and email will invalidate all the access tokens associated.
+    """
     user = User.objects.get(email=email) if not user.is_authenticated() else user
     clients = Client.objects.all()
-    import pudb; pu.db
     for client in clients:
         access_tokens = AccessToken.objects.filter(
             user=user, client=client, expires__gt=timezone.now()
