@@ -245,15 +245,6 @@ def reset_student_attempts(course_id, student, module_state_key, requesting_user
                     requesting_user_id=requesting_user_id
                 )
                 submission_cleared = True
-                SCORE_CHANGED.send(
-                    sender=None,
-                    points_possible=block.max_score,
-                    points_earned=0,
-                    user=student,
-                    course_id=course_id,
-                    usage_id=module_state_key
-                )
-
     except ItemNotFoundError:
         log.warning("Could not find %s in modulestore when attempting to reset attempts.", module_state_key)
 
@@ -277,6 +268,15 @@ def reset_student_attempts(course_id, student, module_state_key, requesting_user
 
     if delete_module:
         module_to_reset.delete()
+        if block:
+            SCORE_CHANGED.send(
+                sender=None,
+                points_possible=block.max_score,
+                points_earned=0,
+                user=student,
+                course_id=course_id,
+                usage_id=module_state_key
+            )
     else:
         _reset_module_attempts(module_to_reset)
 
