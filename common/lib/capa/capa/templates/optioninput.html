@@ -11,7 +11,7 @@
     <p class="question-description" id="${description_id}">${description_text}</p>
   % endfor
 
-   <select name="input_${id}" id="input_${id}" ${describedby | n, decode.utf8}>
+   <select name="input_${id}" id="input_${id}" ${HTML(describedby_html)}>
       <option value="option_${id}_dummy_default">${default_option_text}</option>
       % for option_id, option_description in options:
           <option value="${option_id}"

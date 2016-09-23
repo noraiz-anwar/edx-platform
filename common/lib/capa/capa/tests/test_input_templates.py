@@ -54,7 +54,7 @@ class TemplateTestCase(unittest.TestCase):
                                           'templates',
                                           self.TEMPLATE_NAME)
         with open(self.template_path) as f:
-            self.template = MakoTemplate(f.read())
+            self.template = MakoTemplate(f.read(), default_filters=['decode.utf8'])
 
         self.context = {}
 
@@ -160,7 +160,7 @@ class TemplateTestCase(unittest.TestCase):
         Arguments:
             describedby_xpaths (list): list of xpaths to check aria-describedby attribute
         """
-        self.context['describedby'] = ''
+        self.context['describedby_html'] = ''
         xml = self.render_to_xml(self.context)
 
         # for each xpath verify that description_ids are set correctly
@@ -259,7 +259,7 @@ class ChoiceGroupTemplateTest(TemplateTestCase):
             'name_array_suffix': '1',
             'value': '3',
             'response_data': self.RESPONSE_DATA,
-            'describedby': self.DESCRIBEDBY,
+            'describedby_html': self.DESCRIBEDBY,
         }
 
     def test_problem_marked_correct(self):
@@ -506,7 +506,7 @@ class TextlineTemplateTest(TemplateTestCase):
             'preprocessor': None,
             'trailing_text': None,
             'response_data': self.RESPONSE_DATA,
-            'describedby': self.DESCRIBEDBY,
+            'describedby_html': self.DESCRIBEDBY,
         }
 
     def test_section_class(self):
@@ -632,7 +632,7 @@ class FormulaEquationInputTemplateTest(TemplateTestCase):
             'reported_status': 'REPORTED_STATUS',
             'trailing_text': None,
             'response_data': self.RESPONSE_DATA,
-            'describedby': self.DESCRIBEDBY,
+            'describedby_html': self.DESCRIBEDBY,
         }
 
     def test_no_size(self):
@@ -852,7 +852,7 @@ class OptionInputTemplateTest(TemplateTestCase):
             'value': 0,
             'default_option_text': 'Select an option',
             'response_data': self.RESPONSE_DATA,
-            'describedby': self.DESCRIBEDBY,
+            'describedby_html': self.DESCRIBEDBY,
         }
 
     def test_select_options(self):
